@@ -44,27 +44,44 @@ function getUtmParams(): Record<string, string> {
   return result;
 }
 
-export async function trackPageView(page: string, title: string): Promise<void> {
-  try {
-    const userId = getOrCreateUserId();
-    const sessionId = getOrCreateSessionId();
+function send(payload: Record<string, unknown>): void {
+  const body = JSON.stringify({
+    user_id: getOrCreateUserId(),
+    session_id: getOrCreateSessionId(),
+    page: window.location.pathname,
+    title: document.title,
+    referrer: document.referrer || null,
+    language: navigator.language,
+    screen: `${screen.width}x${screen.height}`,
+    timestamp: new Date().toISOString(),
+    ...getUtmParams(),
+    ...payload,
+  });
+  // keepalive: o evento chega mesmo se o usuário sair da página (ex: clique em link externo)
+  fetch('/api/analytics', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    keepalive: true,
+  }).catch(() => {});
+}
 
-    await fetch('/api/analytics', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        event: 'page_view',
-        user_id: userId,
-        session_id: sessionId,
-        page,
-        title,
-        referrer: document.referrer || null,
-        language: navigator.language,
-        screen: `${screen.width}x${screen.height}`,
-        timestamp: new Date().toISOString(),
-        ...getUtmParams(),
-      }),
-    });
+export function trackPageView(page: string, title: string): void {
+  try {
+    send({ event: 'page_view', page, title });
+  } catch {
+    // Analytics never break the user experience
+  }
+}
+
+/**
+ * Evento customizado (conversão, clique...). Ex:
+ *   trackEvent('whatsapp_click', { label: 'footer' })
+ *   trackEvent('lead_submit', { form: 'budget' })
+ */
+export function trackEvent(event: string, properties?: Record<string, string | number | boolean>): void {
+  try {
+    send({ event, properties });
   } catch {
     // Analytics never break the user experience
   }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { trackEvent } from "@/utils/analytics";
 
 export default function BudgetPage({ isModal = false }: { isModal?: boolean }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -45,6 +46,7 @@ export default function BudgetPage({ isModal = false }: { isModal?: boolean }) {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Erro ao enviar formulário");
 
+      trackEvent("lead_submit", { form: "budget", modal: isModal });
       setIsModalOpen(true);
       form.reset();
     } catch (err) {
