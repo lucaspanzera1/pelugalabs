@@ -44,6 +44,76 @@ function getUtmParams(): Record<string, string> {
   return result;
 }
 
+const FIRST_TOUCH_KEY = 'peluga_first_touch';
+
+/** Como o visitante chegou na primeira visita — sobrevive até ele virar lead. */
+export interface FirstTouch {
+  landingPage: string;
+  referrer?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  firstSeenAt: string;
+}
+
+function isExternal(url: string): boolean {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '') !== window.location.hostname.replace(/^www\./, '');
+  } catch {
+    return false;
+  }
+}
+
+/** Guarda a primeira origem do visitante (uma vez só). */
+function rememberFirstTouch(): void {
+  try {
+    if (localStorage.getItem(FIRST_TOUCH_KEY)) return;
+    const utm = getUtmParams();
+    const ref = document.referrer && isExternal(document.referrer) ? document.referrer : undefined;
+    const ft: FirstTouch = {
+      landingPage: window.location.pathname,
+      referrer: ref,
+      utmSource: utm.utm_source,
+      utmMedium: utm.utm_medium,
+      utmCampaign: utm.utm_campaign,
+      utmContent: utm.utm_content,
+      utmTerm: utm.utm_term,
+      firstSeenAt: new Date().toISOString(),
+    };
+    localStorage.setItem(FIRST_TOUCH_KEY, JSON.stringify(ft));
+  } catch {
+    // localStorage indisponível (modo privado, bloqueado): segue sem first touch
+  }
+}
+
+function readFirstTouch(): Partial<FirstTouch> {
+  try {
+    return JSON.parse(localStorage.getItem(FIRST_TOUCH_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Origem do lead para mandar junto com um formulário: site, página, visitante
+ * do analytics (liga o lead à jornada no CRM) e a primeira origem conhecida.
+ */
+export function getLeadOrigin(form: string): Record<string, string | undefined> {
+  try {
+    return {
+      ...readFirstTouch(),
+      site: window.location.hostname,
+      page: window.location.pathname,
+      form,
+      visitorId: getOrCreateUserId(),
+    };
+  } catch {
+    return { form };
+  }
+}
+
 function send(payload: Record<string, unknown>): void {
   const body = JSON.stringify({
     user_id: getOrCreateUserId(),
@@ -68,6 +138,7 @@ function send(payload: Record<string, unknown>): void {
 
 export function trackPageView(page: string, title: string): void {
   try {
+    rememberFirstTouch();
     send({ event: 'page_view', page, title });
   } catch {
     // Analytics never break the user experience
