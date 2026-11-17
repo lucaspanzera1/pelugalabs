@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { trackEvent } from "@/utils/analytics";
+import { getLeadOrigin, trackEvent } from "@/utils/analytics";
 
 export default function BudgetPage({ isModal = false }: { isModal?: boolean }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -27,14 +27,19 @@ export default function BudgetPage({ isModal = false }: { isModal?: boolean }) {
 
     try {
       const form = e.currentTarget;
+      const projectType = form.elements.namedItem("project-type") as HTMLSelectElement;
+      const budgetRange = form.elements.namedItem("budget-range") as HTMLSelectElement;
       const data = {
         name: (form.elements.namedItem("name") as HTMLInputElement).value,
         email: (form.elements.namedItem("email") as HTMLInputElement).value,
         phone: (form.elements.namedItem("phone") as HTMLInputElement).value,
         company: (form.elements.namedItem("company") as HTMLInputElement).value,
-        projectType: (form.elements.namedItem("project-type") as HTMLSelectElement).value,
-        budgetRange: (form.elements.namedItem("budget-range") as HTMLSelectElement).value,
+        projectType: projectType.value,
+        projectTypeLabel: projectType.value ? projectType.selectedOptions[0]?.text : "",
+        budgetRange: budgetRange.value,
+        budgetRangeLabel: budgetRange.value ? budgetRange.selectedOptions[0]?.text : "",
         description: (form.elements.namedItem("description") as HTMLTextAreaElement).value,
+        origin: getLeadOrigin(isModal ? "budget-modal" : "budget"),
       };
 
       const res = await fetch("/api/send-budget", {

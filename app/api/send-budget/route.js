@@ -1,3 +1,22 @@
+const LEADS_ENDPOINT =
+  process.env.SERVICEDESK_LEADS_URL ?? "https://servicedesk.peluga.com.br/api/crm/leads/public";
+
+const ORIGIN_FIELDS = [
+  "site", "page", "form", "visitorId", "landingPage", "referrer",
+  "utmSource", "utmMedium", "utmCampaign", "utmContent", "utmTerm", "firstSeenAt",
+];
+
+/** Só repassa os campos de origem conhecidos, como string. */
+function pickOrigin(origin) {
+  if (!origin || typeof origin !== "object") return undefined;
+  const out = {};
+  for (const key of ORIGIN_FIELDS) {
+    const value = origin[key];
+    if (typeof value === "string" && value.trim()) out[key] = value.trim().slice(0, 500);
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 export async function POST(request) {
   try {
     const data = await request.json();
@@ -14,6 +33,9 @@ export async function POST(request) {
           ? data.timeline
           : "not-informed",
       description: String(data?.description ?? ""),
+      projectTypeLabel: String(data?.projectTypeLabel ?? ""),
+      budgetRangeLabel: String(data?.budgetRangeLabel ?? ""),
+      origin: pickOrigin(data?.origin),
       features: Array.isArray(data?.features)
         ? data.features
             .filter((feature) => typeof feature === "string")
@@ -22,7 +44,7 @@ export async function POST(request) {
         : [],
     };
 
-    const crmRes = await fetch("https://servicedesk.peluga.com.br/api/crm/leads/public", {
+    const crmRes = await fetch(LEADS_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
